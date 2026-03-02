@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GAME SENTINEL — Community Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Barlow+Condensed:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --accent:        #00ff6a;
+  --accent-dim:    #00cc55;
+  --accent-dark:   #003318;
+  --warn:          #ffb800;
+  --warn-dim:      #cc9400;
+  --danger:        #ff3333;
+  --danger-dim:    #cc2222;
+  --bg:            #080c0a;
+  --bg2:           #0d1210;
+  --bg3:           #111916;
+  --panel:         #0a110e;
+  --border:        #1a2e22;
+  --border-hi:     #234830;
+  --text:          #c8e0cd;
+  --text-dim:      #6a8a72;
+  --font-display:  'Bebas Neue', sans-serif;
+  --font-mono:     'Share Tech Mono', monospace;
+  --font-body:     'Barlow Condensed', sans-serif;
+  --tab-bg:        #080c0a;
+  --tab-active-bg: rgba(0,255,106,0.06);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+/* Scanlines */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999;
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.07) 2px,rgba(0,0,0,0.07) 4px);
+  pointer-events: none;
+  animation: scanMove 10s linear infinite;
+}
+@keyframes scanMove { to { background-position: 0 100px; } }
+
+/* Vignette */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 9998;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.75) 100%);
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════
+   LOADING OVERLAY
+══════════════════════════════════════════════ */
+#loading-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 28px;
+  transition: opacity 0.6s ease;
+}
+#loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+
+.load-logo {
+  font-family: var(--font-display);
+  font-size: 54px; letter-spacing: 0.15em;
+  color: var(--accent);
+  text-shadow: 0 0 30px var(--accent), 0 0 60px rgba(0,255,106,0.3);
+  animation: loadPulse 1.5s ease-in-out infinite;
+}
+@keyframes loadPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+.load-sub {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.3em; color: var(--text-dim); text-transform: uppercase;
+}
+.load-bar-wrap {
+  width: 280px; height: 3px;
+  background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.load-bar {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+  transition: width 0.35s ease;
+  box-shadow: 0 0 10px var(--accent);
+}
+.load-status {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--accent-dim); letter-spacing: 0.2em; min-height: 14px;
+}
+
+/* ══════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════ */
+#site-header {
+  position: sticky; top: 0; z-index: 200;
+  background: rgba(8,12,10,0.97);
+  border-bottom: 1px solid var(--border-hi);
+  backdrop-filter: blur(12px);
+  padding: 0 24px; height: 54px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.hdr-left { display: flex; align-items: center; gap: 14px; }
+.hdr-logo {
+  font-family: var(--font-display); font-size: 26px;
+  letter-spacing: 0.12em; color: var(--accent);
+  text-shadow: 0 0 18px rgba(0,255,106,0.45); line-height: 1;
+  transition: color 0.4s, text-shadow 0.4s;
+}
+.hdr-div { width: 1px; height: 22px; background: var(--border-hi); }
+.status-wrap { display: flex; align-items: center; gap: 7px; }
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 7px var(--accent);
+  animation: blink 2s ease-in-out infinite; flex-shrink: 0;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+.status-dot.stale { background: var(--warn); box-shadow: 0 0 7px var(--warn); animation: none; }
+.status-dot.error { background: var(--danger); box-shadow: 0 0 7px var(--danger); animation: none; }
+@keyframes blink { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.5);opacity:0.6} }
+.status-lbl { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.15em; }
+
+.hdr-right { display: flex; align-items: center; gap: 12px; }
+.last-upd { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.btn-refresh {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.15em;
+  color: var(--accent); background: transparent;
+  border: 1px solid var(--accent-dim);
+  padding: 6px 14px; cursor: pointer; text-transform: uppercase;
+  transition: all 0.2s; position: relative; overflow: hidden;
+}
+.btn-refresh:hover { background: rgba(var(--accent-rgb,0,255,106),0.08); box-shadow: 0 0 12px rgba(0,255,106,0.2); }
+.btn-refresh.spinning { color: var(--text-dim); border-color: var(--border-hi); cursor: not-allowed; }
+.btn-refresh::before {
+  content: ''; position: absolute; top: 50%; left: -30px;
+  width: 20px; height: 100%;
+  background: linear-gradient(90deg,transparent,rgba(255,255,255,0.1),transparent);
+  transform: translateY(-50%) skewX(-15deg);
+  animation: shimmer 2s infinite;
+}
+@keyframes shimmer { 0%{left:-30px} 100%{left:120%} }
+
+/* ══════════════════════════════════════════════
+   GAME TABS
+══════════════════════════════════════════════ */
+#game-tabs {
+  position: sticky; top: 54px; z-index: 190;
+  display: flex;
+  background: rgba(8,12,10,0.97);
+  border-bottom: 1px solid var(--border-hi);
+  backdrop-filter: blur(12px);
+  overflow-x: auto; scrollbar-width: none;
+}
+#game-tabs::-webkit-scrollbar { display: none; }
+
+.game-tab {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;
+  color: var(--text-dim); background: transparent; border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0 22px; height: 42px;
+  cursor: pointer; white-space: nowrap; text-transform: uppercase;
+  transition: color 0.25s, border-color 0.25s, background 0.25s;
+  flex-shrink: 0;
+}
+.game-tab:hover { color: var(--accent); background: rgba(255,255,255,0.02); }
+.game-tab.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+  background: var(--tab-active-bg);
+  text-shadow: 0 0 10px var(--accent);
+}
+
+/* ══════════════════════════════════════════════
+   TICKER
+══════════════════════════════════════════════ */
+#ticker-wrap {
+  background: var(--accent-dark); border-bottom: 1px solid var(--border-hi);
+  height: 30px; overflow: hidden; position: relative;
+  display: flex; align-items: center;
+  transition: background 0.4s;
+}
+#ticker-wrap::before, #ticker-wrap::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 2; pointer-events: none;
+}
+#ticker-wrap::before { left: 0; background: linear-gradient(90deg,var(--accent-dark),transparent); }
+#ticker-wrap::after  { right:0; background: linear-gradient(-90deg,var(--accent-dark),transparent); }
+
+.ticker-label {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.2em; color: var(--accent);
+  background: var(--accent-dark); padding: 0 14px;
+  position: absolute; left: 0; z-index: 3;
+  border-right: 1px solid var(--border-hi);
+  height: 100%; display: flex; align-items: center; white-space: nowrap;
+}
+.ticker-track {
+  display: flex; align-items: center;
+  animation: tickerScroll 45s linear infinite;
+  white-space: nowrap; padding-left: 120px;
+}
+.ticker-track:hover { animation-play-state: paused; }
+@keyframes tickerScroll { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+.ticker-item {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em;
+  color: var(--text); padding: 0 22px;
+  display: inline-flex; align-items: center; gap: 8px;
+  border-right: 1px solid var(--border);
+}
+.tick-badge { font-weight: 700; font-size: 9px; padding: 1px 4px; }
+.tick-badge.pos { color: var(--accent); }
+.tick-badge.neg { color: var(--danger); }
+.tick-badge.neu { color: var(--warn); }
+
+/* ══════════════════════════════════════════════
+   LAYOUT
+══════════════════════════════════════════════ */
+.main-wrap {
+  max-width: 1400px; margin: 0 auto;
+  padding: 20px 18px 60px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+/* ══════════════════════════════════════════════
+   PANEL
+══════════════════════════════════════════════ */
+.panel {
+  background: var(--panel); border: 1px solid var(--border);
+  position: relative; padding: 18px;
+  transition: border-color 0.25s, background 0.4s;
+}
+.panel:hover { border-color: var(--border-hi); }
+
+.panel::before  { content:''; position:absolute; top:-1px;    left:-1px;  width:11px; height:11px; border:2px solid var(--accent-dim); border-right:none; border-bottom:none; pointer-events:none; transition:border-color 0.4s; }
+.panel::after   { content:''; position:absolute; top:-1px;    right:-1px; width:11px; height:11px; border:2px solid var(--accent-dim); border-left:none;  border-bottom:none; pointer-events:none; transition:border-color 0.4s; }
+.panel .pc-br   { position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border:2px solid var(--accent-dim); border-left:none;  border-top:none;   pointer-events:none; transition:border-color 0.4s; }
+.panel .pc-bl   { position:absolute; bottom:-1px; left:-1px;  width:11px; height:11px; border:2px solid var(--accent-dim); border-right:none; border-top:none;   pointer-events:none; transition:border-color 0.4s; }
+
+.panel:hover::before, .panel:hover::after,
+.panel:hover .pc-br, .panel:hover .pc-bl { border-color: var(--accent); }
+
+.panel-title {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.28em; color: var(--text-dim);
+  text-transform: uppercase; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 7px;
+}
+.panel-title::before {
+  content: ''; display: inline-block;
+  width: 3px; height: 10px; background: var(--accent);
+  transition: background 0.4s;
+}
+
+/* ══════════════════════════════════════════════
+   GAUGE PANEL
+══════════════════════════════════════════════ */
+.panel-gauge {
+  grid-column: span 2;
+  display: flex; gap: 28px; align-items: center; min-height: 250px;
+}
+.gauge-left {
+  flex: 0 0 270px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+#gaugeCanvas { display: block; }
+.gauge-val {
+  font-family: var(--font-display); font-size: 52px; line-height: 1;
+  letter-spacing: 0.05em; transition: color 0.4s, text-shadow 0.4s;
+}
+.gauge-lbl {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.3em;
+  color: var(--text-dim); text-transform: uppercase; margin-top: 2px;
+}
+.gauge-right { flex: 1; display: flex; flex-direction: column; gap: 18px; }
+.mood-quote {
+  font-family: var(--font-body); font-style: italic; font-size: 16px;
+  line-height: 1.55; color: var(--text);
+  border-left: 3px solid var(--accent-dim); padding-left: 14px;
+  transition: border-color 0.4s;
+}
+.trending-box {
+  background: rgba(255,184,0,0.05); border: 1px solid var(--warn-dim);
+  padding: 12px 15px; display: flex; align-items: flex-start; gap: 10px;
+  position: relative;
+}
+.trending-box::before { content:''; position:absolute; top:-1px; left:-1px; width:8px; height:8px; border:2px solid var(--warn); border-right:none; border-bottom:none; }
+.trending-box::after  { content:''; position:absolute; bottom:-1px; right:-1px; width:8px; height:8px; border:2px solid var(--warn); border-left:none; border-top:none; }
+.t-icon { color: var(--warn); font-family: var(--font-mono); font-size: 14px; flex-shrink:0; margin-top:1px; }
+.t-lbl { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.22em; color: var(--warn-dim); text-transform: uppercase; margin-bottom: 3px; }
+.t-text { font-family: var(--font-body); font-size: 14px; color: var(--text); line-height: 1.4; }
+
+/* ══════════════════════════════════════════════
+   DISTRIBUTION PANEL
+══════════════════════════════════════════════ */
+.panel-distrib {
+  grid-column: span 1; display: flex; flex-direction: column; min-height: 250px;
+}
+.doughnut-wrap {
+  display: flex; align-items: center; gap: 18px; flex: 1; justify-content: center;
+}
+#doughnutCanvas { max-width: 150px; max-height: 150px; }
+.doughnut-legend { display: flex; flex-direction: column; gap: 12px; }
+.leg-item { display: flex; align-items: center; gap: 7px; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.leg-name { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; color: var(--text-dim); text-transform: uppercase; width: 56px; }
+.leg-pct { font-family: var(--font-display); font-size: 20px; line-height: 1; }
+.distrib-bar { height: 7px; border-radius: 3px; overflow: hidden; display: flex; background: var(--bg3); margin-top: 8px; }
+.db-seg { height: 100%; transition: width 0.9s ease; }
+.db-pos { background: var(--accent); }
+.db-neu { background: var(--warn); }
+.db-neg { background: var(--danger); }
+
+/* ══════════════════════════════════════════════
+   SUBREDDIT CARDS
+══════════════════════════════════════════════ */
+.panel-subs {
+  grid-column: span 3;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  background: transparent; border: none; padding: 0;
+}
+.panel-subs::before,.panel-subs::after,.panel-subs .pc-br,.panel-subs .pc-bl { display: none; }
+.sub-card {
+  background: var(--panel); border: 1px solid var(--border);
+  padding: 16px 18px; position: relative;
+  transition: border-color 0.25s;
+}
+.sub-card::before { content:''; position:absolute; top:-1px; left:-1px; width:10px; height:10px; border:2px solid var(--accent-dim); border-right:none; border-bottom:none; transition:border-color 0.4s; }
+.sub-card::after  { content:''; position:absolute; top:-1px; right:-1px; width:10px; height:10px; border:2px solid var(--accent-dim); border-left:none;  border-bottom:none; transition:border-color 0.4s; }
+.sub-card:hover { border-color: var(--border-hi); }
+.sub-card:hover::before, .sub-card:hover::after { border-color: var(--accent); }
+
+.sub-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.sub-name { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.06em; }
+.sub-name span { color: var(--accent); transition: color 0.4s; }
+.sub-score { font-family: var(--font-display); font-size: 30px; letter-spacing: 0.04em; line-height: 1; }
+.sub-stats { display: flex; gap: 18px; margin-bottom: 10px; }
+.sub-stat-val { font-family: var(--font-display); font-size: 17px; line-height: 1; display: block; }
+.sub-stat-lbl { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.2em; color: var(--text-dim); text-transform: uppercase; }
+.mini-bar { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; display: flex; }
+.mb-pos { background: var(--accent); height: 100%; transition: width 0.9s ease; }
+.mb-neu { background: var(--warn);   height: 100%; transition: width 0.9s ease; }
+.mb-neg { background: var(--danger); height: 100%; transition: width 0.9s ease; }
+
+/* ══════════════════════════════════════════════
+   WORD CLOUD
+══════════════════════════════════════════════ */
+.panel-wordcloud { grid-column: span 2; min-height: 280px; }
+#wordcloudInner {
+  width: 100%; min-height: 230px;
+  padding: 10px 6px;
+  display: flex; flex-wrap: wrap;
+  align-items: center; justify-content: center;
+  gap: 5px 9px; line-height: 1;
+}
+
+/* ══════════════════════════════════════════════
+   TOPICS
+══════════════════════════════════════════════ */
+.panel-topics { grid-column: span 1; min-height: 280px; }
+.topics-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.topic-chip {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em;
+  color: var(--accent);
+  background: rgba(0,255,106,0.05);
+  border: 1px solid rgba(0,255,106,0.22);
+  padding: 6px 11px; cursor: default;
+  transition: all 0.2s, background 0.4s, border-color 0.4s, color 0.4s;
+  opacity: 0; transform: translateY(5px);
+  animation: chipIn 0.35s forwards;
+}
+.topic-chip:hover { background: rgba(0,255,106,0.12); box-shadow: 0 0 10px rgba(0,255,106,0.15); }
+@keyframes chipIn { to { opacity:1; transform:none; } }
+
+/* ══════════════════════════════════════════════
+   FEED
+══════════════════════════════════════════════ */
+.panel-feed { grid-column: span 3; }
+.feed-count { color: var(--text-dim); margin-left: 8px; }
+.feed-list {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 4px;
+  max-height: 620px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: var(--border-hi) var(--bg3);
+}
+.feed-list::-webkit-scrollbar { width: 3px; }
+.feed-list::-webkit-scrollbar-track { background: var(--bg3); }
+.feed-list::-webkit-scrollbar-thumb { background: var(--border-hi); }
+
+.feed-post {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 9px 13px; background: var(--bg3);
+  border: 1px solid transparent; border-left: 2px solid transparent;
+  cursor: pointer; text-decoration: none;
+  transition: all 0.15s;
+  opacity: 0; animation: postIn 0.3s forwards;
+}
+@keyframes postIn { to { opacity: 1; } }
+.feed-post:hover { background: var(--bg2); border-color: var(--border); border-left-color: var(--accent-dim); }
+
+.post-badge {
+  flex-shrink: 0; font-family: var(--font-display); font-size: 15px;
+  letter-spacing: 0.04em; width: 50px; text-align: center;
+  padding: 2px 3px; line-height: 1.1;
+}
+.post-badge.pos { color: var(--accent); }
+.post-badge.neg { color: var(--danger); }
+.post-badge.neu { color: var(--warn); }
+
+.post-body { flex: 1; min-width: 0; }
+.post-meta {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 3px;
+}
+.post-sub { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.14em; color: var(--accent-dim); text-transform: uppercase; transition: color 0.4s; }
+.post-flair { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); background: rgba(255,255,255,0.04); padding: 1px 5px; border-radius: 2px; }
+.post-time { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+.post-title { font-family: var(--font-body); font-size: 14px; color: var(--text); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.15s; }
+.feed-post:hover .post-title { color: #fff; }
+.post-stats { display: flex; gap: 13px; margin-top: 3px; }
+.post-stat { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+
+/* ══════════════════════════════════════════════
+   ERROR
+══════════════════════════════════════════════ */
+.error-banner {
+  grid-column: span 3; background: rgba(255,51,51,0.07);
+  border: 1px solid var(--danger-dim);
+  padding: 14px 18px; font-family: var(--font-mono);
+  font-size: 11px; color: var(--danger); letter-spacing: 0.08em;
+  display: none;
+}
+
+/* ══════════════════════════════════════════════
+   COLOR HELPERS
+══════════════════════════════════════════════ */
+.c-accent  { color: var(--accent); }
+.c-warn    { color: var(--warn); }
+.c-danger  { color: var(--danger); }
+.c-dim     { color: var(--text-dim); }
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .main-wrap { grid-template-columns: 1fr 1fr; }
+  .panel-gauge,.panel-subs,.panel-feed,.panel-wordcloud,.error-banner { grid-column: span 2; }
+  .panel-topics,.panel-distrib { grid-column: span 2; }
+}
+@media (max-width: 600px) {
+  .main-wrap { grid-template-columns: 1fr; }
+  .panel-gauge,.panel-subs,.panel-feed,.panel-wordcloud,.panel-topics,.panel-distrib,.error-banner { grid-column: span 1; }
+  .panel-gauge { flex-direction: column; }
+  .panel-subs { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-overlay">
+  <div class="load-logo">GAME SENTINEL</div>
+  <div class="load-sub">Community Intelligence Network</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+  <div class="load-status" id="loadStatus">INITIALIZING...</div>
+</div>
+
+<!-- HEADER -->
+<header id="site-header">
+  <div class="hdr-left">
+    <div class="hdr-logo" id="hdrLogo">GAME SENTINEL</div>
+    <div class="hdr-div"></div>
+    <div class="status-wrap">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-lbl" id="statusLbl">LIVE</span>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="last-upd" id="lastUpd"></span>
+    <button class="btn-refresh" id="refreshBtn" onclick="refreshData()">↺ REFRESH</button>
+  </div>
+</header>
+
+<!-- GAME TABS -->
+<nav id="game-tabs">
+  <button class="game-tab active" data-game="codm"      onclick="switchGame('codm')">🎯 COD MOBILE</button>
+  <button class="game-tab"        data-game="overwatch" onclick="switchGame('overwatch')">⚡ OVERWATCH</button>
+  <button class="game-tab"        data-game="pubg"      onclick="switchGame('pubg')">🪖 PUBG MOBILE</button>
+  <button class="game-tab"        data-game="r6mobile"  onclick="switchGame('r6mobile')">🛡️ R6 MOBILE</button>
+  <button class="game-tab"        data-game="freefire"  onclick="switchGame('freefire')">🔥 FREE FIRE</button>
+</nav>
+
+<!-- TICKER -->
+<div id="ticker-wrap">
+  <span class="ticker-label" id="tickerLabel">// LIVE INTEL</span>
+  <div class="ticker-track" id="tickerTrack">
+    <span class="ticker-item">LOADING SENTIMENT DATA<span class="tick-badge neu">···</span></span>
+    <span class="ticker-item">LOADING SENTIMENT DATA<span class="tick-badge neu">···</span></span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="main-wrap">
+
+  <div class="error-banner" id="errorBanner"></div>
+
+  <!-- GAUGE -->
+  <div class="panel panel-gauge" id="panelGauge">
+    <div class="pc-br"></div><div class="pc-bl"></div>
+    <div class="gauge-left">
+      <div class="panel-title">// SENTIMENT INDEX</div>
+      <canvas id="gaugeCanvas" width="270" height="155"></canvas>
+      <div style="text-align:center;margin-top:-8px;">
+        <div class="gauge-val" id="gaugeVal">—</div>
+        <div class="gauge-lbl">Overall Score</div>
+      </div>
+    </div>
+    <div class="gauge-right">
+      <div class="panel-title">// COMMUNITY INTEL</div>
+      <div class="mood-quote" id="moodQuote">Awaiting intelligence feed...</div>
+      <div class="trending-box">
+        <div class="t-icon">⚠</div>
+        <div>
+          <div class="t-lbl">Trending Issue</div>
+          <div class="t-text" id="trendingIssue">Scanning community channels...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISTRIBUTION -->
+  <div class="panel panel-distrib">
+    <div class="pc-br"></div><div class="pc-bl"></div>
+    <div class="panel-title">// SENTIMENT SPLIT</div>
+    <div class="doughnut-wrap">
+      <canvas id="doughnutCanvas"></canvas>
+      <div class="doughnut-legend">
+        <div class="leg-item">
+          <div class="leg-dot" style="background:var(--accent)"></div>
+          <span class="leg-name">POS</span>
+          <span class="leg-pct c-accent" id="legPos">—</span>
+        </div>
+        <div class="leg-item">
+          <div class="leg-dot" style="background:var(--warn)"></div>
+          <span class="leg-name">NEU</span>
+          <span class="leg-pct c-warn" id="legNeu">—</span>
+        </div>
+        <div class="leg-item">
+          <div class="leg-dot" style="background:var(--danger)"></div>
+          <span class="leg-name">NEG</span>
+          <span class="leg-pct c-danger" id="legNeg">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="distrib-bar">
+      <div class="db-seg db-pos" id="dbPos" style="width:0%"></div>
+      <div class="db-seg db-neu" id="dbNeu" style="width:0%"></div>
+      <div class="db-seg db-neg" id="dbNeg" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- SUBREDDIT CARDS -->
+  <div class="panel panel-subs">
+    <div class="sub-card" id="subCard0">
+      <div class="sub-header">
+        <div class="sub-name"><span>r/</span><span id="subName0">CODM</span></div>
+        <div class="sub-score c-accent" id="subScore0">—</div>
+      </div>
+      <div class="sub-stats">
+        <div><span class="sub-stat-val c-accent" id="subPos0">—</span><span class="sub-stat-lbl">Positive</span></div>
+        <div><span class="sub-stat-val c-warn"   id="subNeu0">—</span><span class="sub-stat-lbl">Neutral</span></div>
+        <div><span class="sub-stat-val c-danger" id="subNeg0">—</span><span class="sub-stat-lbl">Negative</span></div>
+        <div><span class="sub-stat-val"           id="subCnt0">—</span><span class="sub-stat-lbl">Posts</span></div>
+      </div>
+      <div class="mini-bar">
+        <div class="mb-pos" id="mbPos0" style="width:0%"></div>
+        <div class="mb-neu" id="mbNeu0" style="width:0%"></div>
+        <div class="mb-neg" id="mbNeg0" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="sub-card" id="subCard1">
+      <div class="sub-header">
+        <div class="sub-name"><span>r/</span><span id="subName1">CallofDutyMobile</span></div>
+        <div class="sub-score c-accent" id="subScore1">—</div>
+      </div>
+      <div class="sub-stats">
+        <div><span class="sub-stat-val c-accent" id="subPos1">—</span><span class="sub-stat-lbl">Positive</span></div>
+        <div><span class="sub-stat-val c-warn"   id="subNeu1">—</span><span class="sub-stat-lbl">Neutral</span></div>
+        <div><span class="sub-stat-val c-danger" id="subNeg1">—</span><span class="sub-stat-lbl">Negative</span></div>
+        <div><span class="sub-stat-val"           id="subCnt1">—</span><span class="sub-stat-lbl">Posts</span></div>
+      </div>
+      <div class="mini-bar">
+        <div class="mb-pos" id="mbPos1" style="width:0%"></div>
+        <div class="mb-neu" id="mbNeu1" style="width:0%"></div>
+        <div class="mb-neg" id="mbNeg1" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORD CLOUD -->
+  <div class="panel panel-wordcloud">
+    <div class="pc-br"></div><div class="pc-bl"></div>
+    <div class="panel-title">// WORD FREQUENCY ANALYSIS</div>
+    <div id="wordcloudInner"></div>
+  </div>
+
+  <!-- TOPICS -->
+  <div class="panel panel-topics">
+    <div class="pc-br"></div><div class="pc-bl"></div>
+    <div class="panel-title">// HOT TOPICS</div>
+    <div class="topics-grid" id="topicsGrid"></div>
+  </div>
+
+  <!-- FEED -->
+  <div class="panel panel-feed">
+    <div class="pc-br"></div><div class="pc-bl"></div>
+    <div class="panel-title">// LIVE POST FEED <span class="feed-count" id="feedCount"></span></div>
+    <div class="feed-list" id="feedList"></div>
+  </div>
+
+</main>
+
+<script>
+// ════════════════════════════════════════════
+//  CONFIG — set your Worker URL here
+// ════════════════════════════════════════════
+const WORKER_URL    = 'https://YOUR_WORKER_NAME.YOUR_SUBDOMAIN.workers.dev';
+const AUTO_REFRESH  = 15 * 60 * 1000; // 15 minutes
+
+// ════════════════════════════════════════════
+//  GAME THEMES
+// ════════════════════════════════════════════
+const THEMES = {
+  codm: {
+    '--accent':       '#00ff6a',
+    '--accent-dim':   '#00cc55',
+    '--accent-dark':  '#003318',
+    '--warn':         '#ffb800',
+    '--warn-dim':     '#cc9400',
+    '--danger':       '#ff3333',
+    '--bg':           '#080c0a',
+    '--bg2':          '#0d1210',
+    '--bg3':          '#111916',
+    '--panel':        '#0a110e',
+    '--border':       '#1a2e22',
+    '--border-hi':    '#234830',
+    '--text':         '#c8e0cd',
+    '--text-dim':     '#6a8a72',
+    '--tab-active-bg':'rgba(0,255,106,0.06)',
+    wordPalette: ['#00ff6a','#00cc55','#00aa44','#ffb800','#cc9400','#88eebb','#44cc88','#007733','#ffe066','#66ffaa'],
+    label: 'COD MOBILE',
+  },
+  overwatch: {
+    '--accent':       '#00d4ff',
+    '--accent-dim':   '#00aacc',
+    '--accent-dark':  '#001a2e',
+    '--warn':         '#ff6b35',
+    '--warn-dim':     '#cc5522',
+    '--danger':       '#ff2255',
+    '--bg':           '#040810',
+    '--bg2':          '#080f1a',
+    '--bg3':          '#0d1520',
+    '--panel':        '#070d18',
+    '--border':       '#0d2040',
+    '--border-hi':    '#1a3a60',
+    '--text':         '#c0d8f0',
+    '--text-dim':     '#5a7a9a',
+    '--tab-active-bg':'rgba(0,212,255,0.06)',
+    wordPalette: ['#00d4ff','#00aacc','#0088aa','#ff6b35','#cc5522','#88ccff','#44aadd','#004466','#ffaa77','#77ddff'],
+    label: 'OVERWATCH',
+  },
+  pubg: {
+    '--accent':       '#ffaa00',
+    '--accent-dim':   '#cc8800',
+    '--accent-dark':  '#1a0e00',
+    '--warn':         '#ff6600',
+    '--warn-dim':     '#cc4400',
+    '--danger':       '#ff2200',
+    '--bg':           '#0c0900',
+    '--bg2':          '#150f00',
+    '--bg3':          '#1a1300',
+    '--panel':        '#110d00',
+    '--border':       '#2a1e00',
+    '--border-hi':    '#3d2e00',
+    '--text':         '#e0d0a0',
+    '--text-dim':     '#7a6a40',
+    '--tab-active-bg':'rgba(255,170,0,0.07)',
+    wordPalette: ['#ffaa00','#cc8800','#ff6600','#dd4400','#ffcc55','#ddaa33','#ffdd88','#cc6600','#ffee99','#aa7700'],
+    label: 'PUBG MOBILE',
+  },
+  r6mobile: {
+    '--accent':       '#4488ff',
+    '--accent-dim':   '#2266dd',
+    '--accent-dark':  '#00051a',
+    '--warn':         '#ff9900',
+    '--warn-dim':     '#cc7700',
+    '--danger':       '#ff1133',
+    '--bg':           '#03050f',
+    '--bg2':          '#060a18',
+    '--bg3':          '#090f20',
+    '--panel':        '#060815',
+    '--border':       '#0d1530',
+    '--border-hi':    '#162248',
+    '--text':         '#b0c8f0',
+    '--text-dim':     '#4a6080',
+    '--tab-active-bg':'rgba(68,136,255,0.07)',
+    wordPalette: ['#4488ff','#2266dd','#0044bb','#ff9900','#cc7700','#88aaff','#5599ee','#002299','#ffbb44','#99ccff'],
+    label: 'R6 MOBILE',
+  },
+  freefire: {
+    '--accent':       '#ff6600',
+    '--accent-dim':   '#dd4400',
+    '--accent-dark':  '#1a0500',
+    '--warn':         '#ffcc00',
+    '--warn-dim':     '#cc9900',
+    '--danger':       '#ff0000',
+    '--bg':           '#0f0400',
+    '--bg2':          '#1a0800',
+    '--bg3':          '#200c00',
+    '--panel':        '#160700',
+    '--border':       '#2e1000',
+    '--border-hi':    '#441800',
+    '--text':         '#f0c890',
+    '--text-dim':     '#7a5030',
+    '--tab-active-bg':'rgba(255,102,0,0.07)',
+    wordPalette: ['#ff6600','#dd4400','#ff9900','#ffcc00','#cc7700','#ff8833','#ffaa55','#bb3300','#ffdd66','#ff5500'],
+    label: 'FREE FIRE',
+  },
+};
+
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+let currentGame = 'codm';
+let currentData = null;
+let doughnutChart = null;
+let refreshTimer = null;
+let isLoading = false;
+const gameCache = {}; // per-game data cache in memory
+
+// ════════════════════════════════════════════
+//  LOADING OVERLAY
+// ════════════════════════════════════════════
+const LOAD_STEPS = [
+  { pct: 10,  msg: 'ESTABLISHING CONNECTION...' },
+  { pct: 28,  msg: 'SCRAPING REDDIT FEEDS...' },
+  { pct: 52,  msg: 'RUNNING SENTIMENT ANALYSIS...' },
+  { pct: 74,  msg: 'PROCESSING WORD FREQUENCIES...' },
+  { pct: 90,  msg: 'RENDERING DASHBOARD...' },
+  { pct: 100, msg: 'INTELLIGENCE READY.' },
+];
+let loadIdx = 0, loadTimer = null;
+
+function startLoad() {
+  loadIdx = 0;
+  setLoad(0, LOAD_STEPS[0].msg);
+  loadTimer = setInterval(() => {
+    loadIdx = Math.min(loadIdx + 1, LOAD_STEPS.length - 1);
+    setLoad(LOAD_STEPS[loadIdx].pct, LOAD_STEPS[loadIdx].msg);
+  }, 900);
+}
+function setLoad(pct, msg) {
+  document.getElementById('loadBar').style.width = pct + '%';
+  document.getElementById('loadStatus').textContent = msg;
+}
+function endLoad() {
+  clearInterval(loadTimer);
+  setLoad(100, 'INTELLIGENCE READY.');
+  setTimeout(() => {
+    const o = document.getElementById('loading-overlay');
+    o.classList.add('fade-out');
+    setTimeout(() => o.style.display = 'none', 700);
+  }, 400);
+}
+
+// ════════════════════════════════════════════
+//  THEME SWITCHER
+// ════════════════════════════════════════════
+function applyTheme(game) {
+  const t = THEMES[game];
+  const r = document.documentElement.style;
+  Object.entries(t).forEach(([k, v]) => {
+    if (k.startsWith('--')) r.setProperty(k, v);
+  });
+  // Update logo
+  document.getElementById('hdrLogo').textContent = t.label + ' SENTINEL';
+  document.title = t.label + ' SENTINEL';
+  // Update ticker label
+  document.getElementById('tickerLabel').textContent = '// LIVE INTEL';
+}
+
+// ════════════════════════════════════════════
+//  TAB SWITCHING
+// ════════════════════════════════════════════
+function switchGame(game) {
+  if (game === currentGame && currentData) return;
+  currentGame = game;
+
+  document.querySelectorAll('.game-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.game === game);
+  });
+
+  applyTheme(game);
+
+  // If we have cached data for this game, render it instantly
+  if (gameCache[game]) {
+    currentData = gameCache[game];
+    renderDashboard(currentData);
+    return;
+  }
+
+  clearTimeout(refreshTimer);
+  currentData = null;
+  fetchData(false);
+}
+
+// ════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════
+function fmtScore(s) { return (s >= 0 ? '+' : '') + Number(s).toFixed(2); }
+function scoreClass(s) { return s > 0.15 ? 'pos' : s < -0.15 ? 'neg' : 'neu'; }
+function scoreCssColor(s) {
+  if (s > 0.15)  return 'var(--accent)';
+  if (s < -0.15) return 'var(--danger)';
+  return 'var(--warn)';
+}
+function timeAgo(utc) {
+  const d = Math.floor(Date.now() / 1000) - utc;
+  if (d < 60)    return d + 's ago';
+  if (d < 3600)  return Math.floor(d / 60) + 'm ago';
+  if (d < 86400) return Math.floor(d / 3600) + 'h ago';
+  return Math.floor(d / 86400) + 'd ago';
+}
+function fmtN(n) { return n >= 1000 ? (n/1000).toFixed(1)+'k' : n; }
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════════
+//  GAUGE
+// ════════════════════════════════════════════
+function drawGauge(score) {
+  const canvas = document.getElementById('gaugeCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H - 16, r = Math.min(W / 2, H) - 18;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Track
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI, 0);
+  ctx.lineWidth = 13; ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#1a2e22';
+  ctx.stroke();
+
+  // Colour gradient arc
+  const accentColor  = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const warnColor    = getComputedStyle(document.documentElement).getPropertyValue('--warn').trim();
+  const dangerColor  = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+
+  const grad = ctx.createConicGradient(Math.PI, cx, cy);
+  grad.addColorStop(0,   dangerColor);
+  grad.addColorStop(0.5, warnColor);
+  grad.addColorStop(1,   accentColor);
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI, 0);
+  ctx.lineWidth = 13; ctx.strokeStyle = grad;
+  ctx.stroke();
+
+  // Ticks
+  for (let i = 0; i <= 8; i++) {
+    const a = Math.PI + (i / 8) * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * (r - 19), cy + Math.sin(a) * (r - 19));
+    ctx.lineTo(cx + Math.cos(a) * (r - 8),  cy + Math.sin(a) * (r - 8));
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(200,220,210,0.2)'; ctx.stroke();
+  }
+
+  // Needle
+  const clamp = Math.max(-1, Math.min(1, score));
+  const na = Math.PI + ((clamp + 1) / 2) * Math.PI;
+  const nl = r - 22;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(na) * nl, cy + Math.sin(na) * nl);
+  ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 8;
+  ctx.stroke(); ctx.shadowBlur = 0;
+
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+
+  // Labels
+  ctx.font = '9px "Share Tech Mono"';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = dangerColor;
+  ctx.fillText('-1.0', cx - r + 4, cy - 4);
+  ctx.fillStyle = accentColor;
+  ctx.fillText('+1.0', cx + r - 4, cy - 4);
+  ctx.fillStyle = warnColor;
+  ctx.fillText('0', cx, cy - r - 5);
+}
+
+// ════════════════════════════════════════════
+//  DOUGHNUT
+// ════════════════════════════════════════════
+function renderDoughnut(pos, neu, neg) {
+  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const warnColor   = getComputedStyle(document.documentElement).getPropertyValue('--warn').trim();
+  const dangerColor = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+  const accentDim   = getComputedStyle(document.documentElement).getPropertyValue('--accent-dim').trim();
+  const warnDim     = getComputedStyle(document.documentElement).getPropertyValue('--warn-dim').trim();
+  const dangerDim   = getComputedStyle(document.documentElement).getPropertyValue('--danger-dim').trim();
+
+  const ctx = document.getElementById('doughnutCanvas').getContext('2d');
+  if (doughnutChart) doughnutChart.destroy();
+  doughnutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Positive','Neutral','Negative'],
+      datasets: [{
+        data: [pos, neu, neg],
+        backgroundColor: [accentDim, warnDim, dangerDim],
+        borderColor: [accentColor, warnColor, dangerColor],
+        borderWidth: 1, hoverOffset: 4,
+      }],
+    },
+    options: {
+      responsive: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.parsed}%` } },
+      },
+      animation: { animateRotate: true, duration: 700 },
+    },
+  });
+}
+
+// ════════════════════════════════════════════
+//  WORD CLOUD (pure HTML — no library)
+// ════════════════════════════════════════════
+function renderWordCloud(wordData) {
+  const cloud = document.getElementById('wordcloudInner');
+  cloud.innerHTML = '';
+
+  if (!wordData || wordData.length === 0) {
+    cloud.innerHTML = '<span style="font-family:var(--font-mono);font-size:11px;color:var(--text-dim)">NO DATA</span>';
+    return;
+  }
+
+  const palette = THEMES[currentGame].wordPalette;
+  const maxFreq = wordData[0][1] || 1;
+
+  wordData.slice(0, 55).forEach(([word, count]) => {
+    const ratio    = count / maxFreq;
+    const fontSize = Math.round(11 + ratio * 41);
+    const opacity  = 0.55 + ratio * 0.45;
+    const charSum  = word.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+    const color    = palette[charSum % palette.length];
+    const glowPx   = Math.round(ratio * 14);
+    const rotate   = ratio < 0.6 && word.length < 10
+      ? ((charSum * 7 + word.length * 13) % 31) - 15
+      : 0;
+
+    const span = document.createElement('span');
+    span.textContent = word.toUpperCase();
+    span.title = count + ' mentions';
+    span.style.cssText = `
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: ${fontSize}px;
+      color: ${color};
+      opacity: ${opacity};
+      display: inline-block;
+      transform: rotate(${rotate}deg);
+      text-shadow: 0 0 ${glowPx}px ${color}88;
+      letter-spacing: 0.05em;
+      padding: 2px 3px;
+      cursor: default;
+      transition: opacity 0.2s, transform 0.2s, font-size 0.2s;
+    `;
+    span.addEventListener('mouseover', () => {
+      span.style.opacity = '1';
+      span.style.transform = 'rotate(0deg) scale(1.12)';
+    });
+    span.addEventListener('mouseout', () => {
+      span.style.opacity = String(opacity);
+      span.style.transform = `rotate(${rotate}deg)`;
+    });
+    cloud.appendChild(span);
+  });
+}
+
+// ════════════════════════════════════════════
+//  TICKER
+// ════════════════════════════════════════════
+function updateTicker(posts) {
+  const html = posts.slice(0, 20).map(p => {
+    const sc = scoreClass(p.sentiment_score);
+    const arrow = sc === 'pos' ? '▲' : sc === 'neg' ? '▼' : '—';
+    const title = p.title.length > 55 ? p.title.slice(0, 52) + '...' : p.title;
+    return `<span class="ticker-item">${esc(title)}<span class="tick-badge ${sc}">${arrow} ${fmtScore(p.sentiment_score)}</span></span>`;
+  }).join('');
+  const track = document.getElementById('tickerTrack');
+  track.innerHTML = html + html;
+}
+
+// ════════════════════════════════════════════
+//  SUBREDDIT CARDS
+// ════════════════════════════════════════════
+function updateSubCards(breakdown, subredditNames) {
+  [0, 1].forEach(i => {
+    const name = subredditNames[i];
+    if (!name) return;
+    const d = breakdown[name];
+    if (!d) return;
+    const total = d.post_count || 1;
+    const sc = scoreClass(d.avg_score);
+    const scoreEl = document.getElementById('subScore' + i);
+
+    document.getElementById('subName' + i).textContent = name;
+    scoreEl.textContent = fmtScore(d.avg_score);
+    scoreEl.className = 'sub-score ' + (sc === 'pos' ? 'c-accent' : sc === 'neg' ? 'c-danger' : 'c-warn');
+
+    document.getElementById('subPos' + i).textContent = d.positive;
+    document.getElementById('subNeu' + i).textContent = d.neutral;
+    document.getElementById('subNeg' + i).textContent = d.negative;
+    document.getElementById('subCnt' + i).textContent = d.post_count;
+
+    document.getElementById('mbPos' + i).style.width = ((d.positive / total) * 100) + '%';
+    document.getElementById('mbNeu' + i).style.width = ((d.neutral  / total) * 100) + '%';
+    document.getElementById('mbNeg' + i).style.width = ((d.negative / total) * 100) + '%';
+  });
+}
+
+// ════════════════════════════════════════════
+//  POST FEED
+// ════════════════════════════════════════════
+function renderFeed(posts) {
+  const list = document.getElementById('feedList');
+  document.getElementById('feedCount').textContent = `(${posts.length})`;
+  list.innerHTML = '';
+
+  posts.forEach((p, i) => {
+    const sc = scoreClass(p.sentiment_score);
+    const a = document.createElement('a');
+    a.href = p.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.className = 'feed-post';
+    a.style.animationDelay = Math.min(i * 15, 450) + 'ms';
+    a.innerHTML = `
+      <div class="post-badge ${sc}">${fmtScore(p.sentiment_score)}</div>
+      <div class="post-body">
+        <div class="post-meta">
+          <span class="post-sub">r/${esc(p.subreddit)}</span>
+          ${p.link_flair_text ? `<span class="post-flair">${esc(p.link_flair_text)}</span>` : ''}
+          <span class="post-time">${timeAgo(p.created_utc)}</span>
+        </div>
+        <div class="post-title">${esc(p.title)}</div>
+        <div class="post-stats">
+          <span class="post-stat">▲ ${fmtN(p.score)}</span>
+          <span class="post-stat">💬 ${fmtN(p.num_comments)}</span>
+        </div>
+      </div>`;
+    list.appendChild(a);
+  });
+}
+
+// ════════════════════════════════════════════
+//  MAIN RENDER
+// ════════════════════════════════════════════
+function renderDashboard(data) {
+  const { summary, subreddit_breakdown, word_cloud, posts, subreddit_names } = data;
+
+  // Gauge + score
+  drawGauge(summary.overall_score);
+  const gv = document.getElementById('gaugeVal');
+  gv.textContent = fmtScore(summary.overall_score);
+  gv.style.color = scoreCssColor(summary.overall_score);
+  gv.style.textShadow = `0 0 20px ${scoreCssColor(summary.overall_score)}80`;
+
+  // Mood + trending
+  document.getElementById('moodQuote').textContent = `"${summary.community_mood}"`;
+  document.getElementById('trendingIssue').textContent = summary.trending_issue;
+
+  // Distribution
+  document.getElementById('legPos').textContent = summary.positive_pct + '%';
+  document.getElementById('legNeu').textContent = summary.neutral_pct  + '%';
+  document.getElementById('legNeg').textContent = summary.negative_pct + '%';
+  document.getElementById('dbPos').style.width = summary.positive_pct + '%';
+  document.getElementById('dbNeu').style.width = summary.neutral_pct  + '%';
+  document.getElementById('dbNeg').style.width = summary.negative_pct + '%';
+  renderDoughnut(summary.positive_pct, summary.neutral_pct, summary.negative_pct);
+
+  // Subreddit cards
+  updateSubCards(subreddit_breakdown, subreddit_names || Object.keys(subreddit_breakdown));
+
+  // Topics
+  const tg = document.getElementById('topicsGrid');
+  tg.innerHTML = '';
+  (summary.top_topics || []).forEach((t, i) => {
+    const c = document.createElement('div');
+    c.className = 'topic-chip';
+    c.textContent = t.toUpperCase();
+    c.style.animationDelay = (i * 80) + 'ms';
+    tg.appendChild(c);
+  });
+
+  // Word cloud
+  renderWordCloud(word_cloud);
+
+  // Ticker + feed
+  updateTicker(posts);
+  renderFeed(posts);
+
+  // Status
+  const dot = document.getElementById('statusDot');
+  const lbl = document.getElementById('statusLbl');
+  dot.className = 'status-dot' + (data.cached ? ' stale' : '');
+  lbl.textContent = data.cached ? 'CACHED' : 'LIVE';
+  document.getElementById('lastUpd').textContent =
+    'FETCHED: ' + new Date(data.generated_at).toLocaleTimeString();
+}
+
+// ════════════════════════════════════════════
+//  FETCH
+// ════════════════════════════════════════════
+async function fetchData(isFirst = false) {
+  if (isLoading) return;
+  isLoading = true;
+
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '↻ SCANNING...';
+  btn.classList.add('spinning');
+
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot stale';
+  document.getElementById('statusLbl').textContent = 'FETCHING';
+
+  if (isFirst) startLoad();
+
+  try {
+    const res = await fetch(`${WORKER_URL}/api/sentiment?game=${currentGame}`, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    currentData = data;
+    gameCache[currentGame] = data;
+    renderDashboard(data);
+    hideError();
+  } catch (err) {
+    console.error('Fetch error:', err);
+    showError('SIGNAL LOST — ' + err.message + '. Ensure WORKER_URL is configured and the Worker is deployed.');
+    dot.className = 'status-dot error';
+    document.getElementById('statusLbl').textContent = 'ERROR';
+    drawGauge(0);
+  } finally {
+    isLoading = false;
+    btn.textContent = '↺ REFRESH';
+    btn.classList.remove('spinning');
+    if (isFirst) endLoad();
+    scheduleRefresh();
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBanner');
+  el.style.display = 'block';
+  el.textContent = '// ' + msg;
+}
+function hideError() {
+  document.getElementById('errorBanner').style.display = 'none';
+}
+function refreshData() {
+  delete gameCache[currentGame];
+  clearTimeout(refreshTimer);
+  fetchData(false);
+}
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    delete gameCache[currentGame];
+    fetchData(false);
+  }, AUTO_REFRESH);
+}
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  applyTheme('codm');
+  drawGauge(0);
+  fetchData(true);
+});
+</script>
+</body>
+</html>
