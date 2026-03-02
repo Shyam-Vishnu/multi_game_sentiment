@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GAME SENTINEL — System Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:      #080c0a;
+  --bg2:     #0d1210;
+  --bg3:     #111916;
+  --panel:   #0a110e;
+  --border:  #1a2e22;
+  --borderh: #2a4a33;
+  --green:   #00ff6a;
+  --greend:  #00cc55;
+  --greendark: #003318;
+  --amber:   #ffb800;
+  --amberd:  #cc9400;
+  --red:     #ff3333;
+  --redd:    #cc2222;
+  --blue:    #00d4ff;
+  --blued:   #0099cc;
+  --purple:  #cc88ff;
+  --text:    #c8e0cd;
+  --textd:   #6a8a72;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:15px; line-height:1.5;
+  min-height:100vh;
+}
+
+/* scanlines */
+body::before{
+  content:''; position:fixed; inset:0; z-index:9999; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);
+}
+body::after{
+  content:''; position:fixed; inset:0; z-index:9998; pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.65) 100%);
+}
+
+/* ── HEADER ── */
+header{
+  background:rgba(8,12,10,0.98);
+  border-bottom:1px solid var(--borderh);
+  padding:18px 40px 16px;
+  display:flex; align-items:flex-end; justify-content:space-between;
+}
+.hdr-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:42px; letter-spacing:0.14em;
+  color:var(--green); text-shadow:0 0 24px rgba(0,255,106,0.4);
+  line-height:1;
+}
+.hdr-sub{
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:0.3em; color:var(--textd);
+  text-transform:uppercase; margin-top:5px;
+}
+.hdr-tag{
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:0.2em; color:var(--textd);
+  border:1px solid var(--border); padding:5px 12px;
+}
+
+/* ── LAYOUT ── */
+.wrap{ max-width:1200px; margin:0 auto; padding:36px 32px 80px; }
+
+/* ── SECTION TITLE ── */
+.section-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:28px; letter-spacing:0.14em;
+  color:var(--green); margin-bottom:6px;
+  display:flex; align-items:center; gap:12px;
+}
+.section-title::before{
+  content:''; width:4px; height:28px; background:var(--green);
+  box-shadow:0 0 10px var(--green); flex-shrink:0;
+}
+.section-sub{
+  font-family:'Share Tech Mono',monospace;
+  font-size:10px; letter-spacing:0.22em; color:var(--textd);
+  text-transform:uppercase; margin-bottom:28px; margin-left:16px;
+}
+
+/* ── ARCH DIAGRAM ── */
+.diagram{
+  background:var(--panel); border:1px solid var(--border);
+  padding:36px 28px; margin-bottom:48px; position:relative;
+  overflow:hidden;
+}
+.diagram::before,.diagram::after{
+  content:''; position:absolute; width:14px; height:14px;
+  border:2px solid var(--greend); pointer-events:none;
+}
+.diagram::before{ top:-1px; left:-1px; border-right:none; border-bottom:none; }
+.diagram::after { top:-1px; right:-1px; border-left:none; border-bottom:none; }
+
+.diag-flow{
+  display:flex; align-items:stretch; justify-content:center;
+  gap:0; flex-wrap:wrap;
+}
+
+/* nodes */
+.node{
+  display:flex; flex-direction:column; align-items:center;
+  gap:10px; padding:20px 14px; min-width:140px;
+  position:relative; flex-shrink:0;
+}
+.node-icon{
+  font-size:32px; line-height:1;
+  filter:drop-shadow(0 0 8px currentColor);
+}
+.node-box{
+  border:1px solid; padding:12px 16px; text-align:center;
+  position:relative; min-width:130px;
+}
+.node-box::before,.node-box::after{
+  content:''; position:absolute; width:8px; height:8px;
+  border-style:solid; pointer-events:none;
+}
+.node-label{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:18px; letter-spacing:0.1em; line-height:1; margin-bottom:5px;
+}
+.node-desc{
+  font-family:'Share Tech Mono',monospace;
+  font-size:9px; letter-spacing:0.12em; color:var(--textd);
+  line-height:1.5;
+}
+
+/* node colours */
+.node-user   .node-box{ border-color:var(--blue);   background:rgba(0,212,255,0.05); }
+.node-user   .node-box::before{ top:-1px; left:-1px; border-color:var(--blue); border-width:2px 0 0 2px; }
+.node-user   .node-box::after { bottom:-1px; right:-1px; border-color:var(--blue); border-width:0 2px 2px 0; }
+.node-user   .node-label{ color:var(--blue); }
+
+.node-github .node-box{ border-color:var(--purple); background:rgba(204,136,255,0.05); }
+.node-github .node-box::before{ top:-1px; left:-1px; border-color:var(--purple); border-width:2px 0 0 2px; }
+.node-github .node-box::after { bottom:-1px; right:-1px; border-color:var(--purple); border-width:0 2px 2px 0; }
+.node-github .node-label{ color:var(--purple); }
+
+.node-cf     .node-box{ border-color:var(--amber);  background:rgba(255,184,0,0.05); }
+.node-cf     .node-box::before{ top:-1px; left:-1px; border-color:var(--amber); border-width:2px 0 0 2px; }
+.node-cf     .node-box::after { bottom:-1px; right:-1px; border-color:var(--amber); border-width:0 2px 2px 0; }
+.node-cf     .node-label{ color:var(--amber); }
+
+.node-reddit .node-box{ border-color:#ff4500; background:rgba(255,69,0,0.05); }
+.node-reddit .node-box::before{ top:-1px; left:-1px; border-color:#ff4500; border-width:2px 0 0 2px; }
+.node-reddit .node-box::after { bottom:-1px; right:-1px; border-color:#ff4500; border-width:0 2px 2px 0; }
+.node-reddit .node-label{ color:#ff4500; }
+
+.node-openai .node-box{ border-color:var(--green);  background:rgba(0,255,106,0.05); }
+.node-openai .node-box::before{ top:-1px; left:-1px; border-color:var(--green); border-width:2px 0 0 2px; }
+.node-openai .node-box::after { bottom:-1px; right:-1px; border-color:var(--green); border-width:0 2px 2px 0; }
+.node-openai .node-label{ color:var(--green); }
+
+/* arrows */
+.arrow{
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:center; padding:0 6px; min-width:80px; gap:4px;
+}
+.arrow-line{
+  display:flex; align-items:center; gap:0; width:100%;
+}
+.arrow-shaft{
+  flex:1; height:2px; background:var(--borderh);
+  position:relative;
+}
+.arrow-shaft::after{
+  content:''; position:absolute; right:-1px; top:50%;
+  transform:translateY(-50%);
+  border-left:8px solid var(--borderh);
+  border-top:5px solid transparent;
+  border-bottom:5px solid transparent;
+}
+.arrow-label{
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:0.14em; color:var(--textd);
+  text-transform:uppercase; text-align:center; line-height:1.3;
+  white-space:nowrap;
+}
+.arrow-label em{
+  display:block; color:var(--green); font-style:normal; font-size:7px;
+}
+
+/* two-headed arrow */
+.arrow-both .arrow-shaft::before{
+  content:''; position:absolute; left:-1px; top:50%;
+  transform:translateY(-50%);
+  border-right:8px solid var(--borderh);
+  border-top:5px solid transparent;
+  border-bottom:5px solid transparent;
+}
+
+/* ── DETAIL GRID ── */
+.detail-grid{
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  gap:16px; margin-bottom:48px;
+}
+.detail-card{
+  background:var(--panel); border:1px solid var(--border);
+  padding:22px 20px; position:relative;
+  transition:border-color 0.2s;
+}
+.detail-card:hover{ border-color:var(--borderh); }
+.detail-card::before,.detail-card::after{
+  content:''; position:absolute; width:10px; height:10px;
+  border-style:solid; pointer-events:none;
+}
+
+/* card accent colours */
+.card-github ::before,.card-github::after{ border-color:var(--purple); }
+.card-github{ --card-accent:var(--purple); }
+.card-cf     { --card-accent:var(--amber); }
+.card-openai { --card-accent:var(--green); }
+.card-reddit { --card-accent:#ff4500; }
+.card-sentiment{ --card-accent:var(--blue); }
+.card-wordcloud{ --card-accent:var(--amberd); }
+
+.detail-card::before{ top:-1px; left:-1px; border-width:2px 0 0 2px; border-color:var(--card-accent,var(--greend)); }
+.detail-card::after { bottom:-1px; right:-1px; border-width:0 2px 2px 0; border-color:var(--card-accent,var(--greend)); }
+
+.card-header{
+  display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  padding-bottom:12px; border-bottom:1px solid var(--border);
+}
+.card-icon{ font-size:24px; line-height:1; }
+.card-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:20px; letter-spacing:0.1em;
+  color:var(--card-accent,var(--green)); line-height:1;
+}
+.card-subtitle{
+  font-family:'Share Tech Mono',monospace;
+  font-size:8px; letter-spacing:0.2em; color:var(--textd);
+  text-transform:uppercase; margin-top:2px;
+}
+
+.card-body p{
+  font-size:14px; color:var(--text); margin-bottom:10px; line-height:1.55;
+}
+.card-body p:last-child{ margin-bottom:0; }
+.card-body strong{ color:#fff; font-weight:600; }
+.card-body em{ color:var(--card-accent,var(--green)); font-style:normal; }
+
+/* ── FLOW STEPS ── */
+.flow-steps{ margin-bottom:48px; }
+.flow-step{
+  display:flex; gap:20px; align-items:flex-start;
+  padding:18px 0; border-bottom:1px solid var(--border);
+  position:relative;
+}
+.flow-step:last-child{ border-bottom:none; }
+.step-num{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:42px; line-height:1; letter-spacing:0.05em;
+  color:var(--border); flex-shrink:0; width:52px; text-align:right;
+  transition:color 0.2s;
+}
+.flow-step:hover .step-num{ color:var(--greend); }
+.step-body{ flex:1; }
+.step-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:20px; letter-spacing:0.1em; color:var(--text); margin-bottom:6px;
+}
+.step-desc{ font-size:14px; color:var(--textd); line-height:1.6; }
+.step-desc strong{ color:var(--text); font-weight:600; }
+.step-desc em{ color:var(--green); font-style:normal; }
+.step-tag{
+  display:inline-block; margin-top:8px; margin-right:6px;
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  letter-spacing:0.14em; color:var(--amber);
+  border:1px solid rgba(255,184,0,0.3); padding:2px 8px;
+}
+
+/* ── SENTIMENT DEEP DIVE ── */
+.sentiment-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:48px;
+}
+.sent-box{
+  background:var(--bg3); border:1px solid var(--border); padding:20px;
+}
+.sent-box-title{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:16px; letter-spacing:0.12em; color:var(--amber);
+  margin-bottom:12px; display:flex; align-items:center; gap:8px;
+}
+.sent-box-title::before{
+  content:''; width:3px; height:14px; background:var(--amber); flex-shrink:0;
+}
+.sent-row{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 0; border-bottom:1px solid var(--border);
+  font-family:'Share Tech Mono',monospace; font-size:11px;
+}
+.sent-row:last-child{ border-bottom:none; }
+.sent-key{ color:var(--textd); letter-spacing:0.1em; }
+.sent-val{ color:var(--text); }
+.sent-val.pos{ color:var(--green); }
+.sent-val.neg{ color:var(--red); }
+.sent-val.neu{ color:var(--amber); }
+
+/* score bar */
+.score-bar{
+  margin:16px 0 6px; height:6px; background:var(--border); border-radius:3px;
+  overflow:visible; position:relative;
+}
+.score-track{
+  height:100%; border-radius:3px;
+  background:linear-gradient(90deg,var(--red),var(--amber),var(--green));
+}
+.score-pointer{
+  position:absolute; top:50%; width:12px; height:12px;
+  background:#fff; border-radius:50%; transform:translate(-50%,-50%);
+  box-shadow:0 0 8px #fff;
+}
+.score-labels{
+  display:flex; justify-content:space-between;
+  font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--textd);
+  margin-top:4px;
+}
+
+/* ── WORDCLOUD DETAIL ── */
+.wc-pipeline{
+  display:flex; flex-direction:column; gap:0; margin-bottom:8px;
+}
+.wc-step{
+  display:flex; align-items:flex-start; gap:14px;
+  padding:14px 0; border-bottom:1px solid var(--border);
+}
+.wc-step:last-child{ border-bottom:none; }
+.wc-num{
+  font-family:'Bebas Neue',sans-serif; font-size:22px;
+  color:var(--amberd); flex-shrink:0; width:28px; line-height:1;
+}
+.wc-title{
+  font-family:'Share Tech Mono',monospace; font-size:11px;
+  letter-spacing:0.14em; color:var(--amber); text-transform:uppercase;
+  margin-bottom:4px;
+}
+.wc-desc{ font-size:13px; color:var(--textd); line-height:1.5; }
+.wc-desc strong{ color:var(--text); }
+.wc-desc code{
+  font-family:'Share Tech Mono',monospace; font-size:10px;
+  color:var(--green); background:rgba(0,255,106,0.06);
+  padding:1px 5px; border-radius:2px;
+}
+
+/* ── CACHE TABLE ── */
+.cache-table{ width:100%; border-collapse:collapse; margin-top:14px; }
+.cache-table th{
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  letter-spacing:0.18em; color:var(--textd); text-transform:uppercase;
+  text-align:left; padding:8px 12px; border-bottom:1px solid var(--borderh);
+  background:var(--bg3);
+}
+.cache-table td{
+  font-family:'Share Tech Mono',monospace; font-size:10px;
+  color:var(--text); padding:8px 12px;
+  border-bottom:1px solid var(--border); vertical-align:top;
+}
+.cache-table tr:last-child td{ border-bottom:none; }
+.badge{
+  display:inline-block; font-size:8px; padding:1px 6px;
+  letter-spacing:0.12em; border-radius:2px;
+}
+.badge-green{ background:rgba(0,255,106,0.12); color:var(--green); border:1px solid rgba(0,255,106,0.3); }
+.badge-amber{ background:rgba(255,184,0,0.10); color:var(--amber); border:1px solid rgba(255,184,0,0.3); }
+.badge-red  { background:rgba(255,51,51,0.10);  color:var(--red);   border:1px solid rgba(255,51,51,0.3);  }
+.badge-blue { background:rgba(0,212,255,0.10);  color:var(--blue);  border:1px solid rgba(0,212,255,0.3);  }
+
+/* ── DIVIDER ── */
+.divider{
+  border:none; border-top:1px solid var(--border);
+  margin:42px 0;
+  position:relative;
+}
+.divider::after{
+  content:attr(data-label);
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  letter-spacing:0.3em; color:var(--textd); text-transform:uppercase;
+  background:var(--bg); padding:0 14px;
+}
+
+/* ── MONO CODE BLOCK ── */
+.mono-block{
+  background:var(--bg3); border:1px solid var(--border);
+  padding:16px 18px; margin:12px 0;
+  font-family:'Share Tech Mono',monospace; font-size:11px;
+  color:var(--greend); line-height:1.7; letter-spacing:0.06em;
+  white-space:pre; overflow-x:auto;
+}
+.mono-block .c{ color:var(--textd); }
+.mono-block .k{ color:var(--amber); }
+.mono-block .s{ color:var(--green); }
+.mono-block .n{ color:var(--blue); }
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border); padding:24px 40px;
+  display:flex; justify-content:space-between; align-items:center;
+  background:rgba(8,12,10,0.98);
+}
+.footer-logo{
+  font-family:'Bebas Neue',sans-serif; font-size:20px;
+  letter-spacing:0.14em; color:var(--greend);
+}
+.footer-note{
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  letter-spacing:0.18em; color:var(--textd); text-transform:uppercase;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="hdr-title">GAME SENTINEL</div>
+    <div class="hdr-sub">System Architecture & Technical Reference</div>
+  </div>
+  <div class="hdr-tag">ARCHITECTURE OVERVIEW // REV 2.0</div>
+</header>
+
+<div class="wrap">
+
+<!-- ══════════════════════════════════════════
+     ARCHITECTURE DIAGRAM
+══════════════════════════════════════════ -->
+<div class="section-title">01 — System Architecture Diagram</div>
+<div class="section-sub">End-to-end data flow across all services</div>
+
+<div class="diagram">
+
+  <!-- TOP ROW: User → GitHub → Cloudflare Worker -->
+  <div class="diag-flow" style="margin-bottom:32px;">
+
+    <div class="node node-user">
+      <div class="node-icon" style="color:var(--blue)">👤</div>
+      <div class="node-box">
+        <div class="node-label">USER BROWSER</div>
+        <div class="node-desc">Opens the dashboard<br/>clicks game tabs<br/>reads sentiment data</div>
+      </div>
+    </div>
+
+    <div class="arrow arrow-both">
+      <div class="arrow-line">
+        <div class="arrow-shaft"></div>
+      </div>
+      <div class="arrow-label">HTTPS<em>loads page / GET /api/sentiment</em></div>
+    </div>
+
+    <div class="node node-github">
+      <div class="node-icon" style="color:var(--purple)">📄</div>
+      <div class="node-box">
+        <div class="node-label">GITHUB PAGES</div>
+        <div class="node-desc">Serves index.html<br/>static hosting only<br/>no server-side logic</div>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-line">
+        <div class="arrow-shaft"></div>
+      </div>
+      <div class="arrow-label">REST API CALL<em>?game=codm etc.</em></div>
+    </div>
+
+    <div class="node node-cf">
+      <div class="node-icon" style="color:var(--amber)">⚙️</div>
+      <div class="node-box">
+        <div class="node-label">CLOUDFLARE WORKER</div>
+        <div class="node-desc">Processes all logic<br/>manages cache<br/>orchestrates APIs</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Vertical connector line -->
+  <div style="display:flex;justify-content:flex-end;padding-right:calc(50% - 70px);margin-bottom:0;">
+    <div style="width:2px;height:36px;background:var(--borderh);position:relative;">
+      <div style="position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);
+        border-top:8px solid var(--borderh);border-left:5px solid transparent;border-right:5px solid transparent;"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW: Worker → Reddit + OpenAI (centred under Worker) -->
+  <div class="diag-flow" style="justify-content:flex-end;gap:0;">
+
+    <div style="min-width:calc(50% - 220px);"></div><!-- spacer -->
+
+    <div class="node node-reddit" style="min-width:160px;">
+      <div class="node-icon" style="color:#ff4500">📋</div>
+      <div class="node-box">
+        <div class="node-label">REDDIT API</div>
+        <div class="node-desc">Public JSON feeds<br/>/hot.json /new.json<br/>no auth required</div>
+      </div>
+    </div>
+
+    <div class="arrow" style="flex-direction:column-reverse;">
+      <div class="arrow-line" style="flex-direction:row-reverse;">
+        <div class="arrow-shaft" style="transform:scaleX(-1)"></div>
+      </div>
+      <div class="arrow-label">POST TITLES + SCORES<em>raw post JSON</em></div>
+    </div>
+
+    <div class="node node-cf" style="visibility:hidden;pointer-events:none;min-width:140px;"><!-- ghost --></div>
+
+    <div class="arrow">
+      <div class="arrow-line">
+        <div class="arrow-shaft"></div>
+      </div>
+      <div class="arrow-label">TITLES BATCH<em>60 posts → GPT-4o-mini</em></div>
+    </div>
+
+    <div class="node node-openai">
+      <div class="node-icon" style="color:var(--green)">🧠</div>
+      <div class="node-box">
+        <div class="node-label">OPENAI API</div>
+        <div class="node-desc">gpt-4o-mini model<br/>zero-shot sentiment<br/>returns JSON scores</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Cache label -->
+  <div style="margin-top:28px;display:flex;justify-content:center;">
+    <div style="display:inline-flex;align-items:center;gap:12px;
+      background:rgba(255,184,0,0.06);border:1px solid var(--amberd);
+      padding:10px 20px;">
+      <span style="color:var(--amber);font-size:18px;">💾</span>
+      <div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.1em;color:var(--amber);">CLOUDFLARE CACHE</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:0.14em;color:var(--textd);">15-MINUTE TTL · PER-GAME KEY · caches.default</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     COMPONENT BREAKDOWN
+══════════════════════════════════════════ -->
+<div class="section-title">02 — Component Breakdown</div>
+<div class="section-sub">What each service is responsible for</div>
+
+<div class="detail-grid">
+
+  <!-- GitHub Pages -->
+  <div class="detail-card card-github">
+    <div class="card-header">
+      <div class="card-icon">📄</div>
+      <div>
+        <div class="card-title card-github" style="color:var(--purple);">GitHub Pages</div>
+        <div class="card-subtitle">Static File Hosting</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Hosts a <strong>single index.html file</strong> — nothing else. GitHub Pages is a free static web server that serves this file to anyone who visits your URL.</p>
+      <p>It has <em>zero backend logic</em>. It cannot run code, call APIs, or store data. It simply hands the HTML file to the user's browser and its job is done.</p>
+      <p>The browser then runs all the JavaScript inside that file, which is what builds the dashboard and calls the Cloudflare Worker for data.</p>
+      <p><strong>Why GitHub Pages?</strong> Free, zero config, deploys on every git push, HTTPS included, custom domain support available.</p>
+    </div>
+  </div>
+
+  <!-- Cloudflare Worker -->
+  <div class="detail-card card-cf">
+    <div class="card-header">
+      <div class="card-icon">⚙️</div>
+      <div>
+        <div class="card-title" style="color:var(--amber);">Cloudflare Worker</div>
+        <div class="card-subtitle">Backend Logic & Orchestration</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>The <strong>entire backend</strong> — all logic lives here. It runs on Cloudflare's global edge network (300+ data centres), executing in milliseconds near the user.</p>
+      <p>It receives a request like <em>GET /api/sentiment?game=codm</em>, checks the cache, fetches Reddit, calls OpenAI, builds the response, and returns JSON.</p>
+      <p>It also <strong>protects your OpenAI key</strong> — the key never touches the browser. The Worker holds it as an encrypted environment secret.</p>
+      <p><strong>Why a Worker and not just calling APIs from the browser?</strong> CORS restrictions, API key security, and server-side caching all require a backend layer.</p>
+    </div>
+  </div>
+
+  <!-- OpenAI API Key -->
+  <div class="detail-card card-openai">
+    <div class="card-header">
+      <div class="card-icon">🔑</div>
+      <div>
+        <div class="card-title" style="color:var(--green);">OpenAI API Key</div>
+        <div class="card-subtitle">Authentication Credential</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>The key is a <strong>bearer token</strong> — it tells OpenAI's servers "this request is authorised to use my account and bill me." Without it, all API calls return 401 Unauthorized.</p>
+      <p>It is stored as a <em>Cloudflare Worker Secret</em> — encrypted at rest, injected as an environment variable at runtime, never visible in logs or code.</p>
+      <p>The key itself doesn't do any AI work. It's purely <strong>authentication</strong>. The actual intelligence is the model (gpt-4o-mini) running on OpenAI's servers.</p>
+      <p><strong>Cost:</strong> gpt-4o-mini costs ~$0.15 per million input tokens. A full 60-post analysis uses roughly 2,000 tokens = fractions of a cent per run.</p>
+    </div>
+  </div>
+
+  <!-- Reddit -->
+  <div class="detail-card card-reddit">
+    <div class="card-header">
+      <div class="card-icon">📋</div>
+      <div>
+        <div class="card-title" style="color:#ff4500;">Reddit JSON API</div>
+        <div class="card-subtitle">Data Source</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Reddit exposes a <strong>free, public, unauthenticated JSON API</strong>. Any subreddit URL can have <em>.json</em> appended to return machine-readable post data.</p>
+      <p>The Worker fetches <strong>4 endpoints per game</strong> — hot and new for each of the two subreddits — all in parallel using <em>Promise.all()</em>.</p>
+      <p>Posts are then <strong>deduplicated by post ID</strong> (since hot and new often overlap) and stickied mod posts are stripped out before sending to OpenAI.</p>
+      <p><strong>No Reddit account or API key required.</strong> The Worker identifies itself with a User-Agent header as good practice.</p>
+    </div>
+  </div>
+
+  <!-- Sentiment Model -->
+  <div class="detail-card card-sentiment">
+    <div class="card-header">
+      <div class="card-icon">🧠</div>
+      <div>
+        <div class="card-title" style="color:var(--blue);">Sentiment Analysis</div>
+        <div class="card-subtitle">OpenAI gpt-4o-mini</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Uses <strong>zero-shot prompting</strong> — no training data, no fine-tuning. The model is given a system prompt describing the task and a numbered list of post titles.</p>
+      <p><em>response_format: json_object</em> forces the model to return only valid JSON — no markdown, no explanation — making it safe to parse directly.</p>
+      <p>The model returns a <strong>score per post</strong> (−1.0 to +1.0), a category, and a summary object with percentages, top topics, a mood sentence, and a trending issue.</p>
+      <p><strong>Why gpt-4o-mini?</strong> It understands gaming slang, community context, and nuanced frustration (e.g. "this is peak design" is positive) far better than keyword-matching.</p>
+    </div>
+  </div>
+
+  <!-- Word Cloud -->
+  <div class="detail-card card-wordcloud">
+    <div class="card-header">
+      <div class="card-icon">💬</div>
+      <div>
+        <div class="card-title" style="color:var(--amberd);">Word Cloud</div>
+        <div class="card-subtitle">Server + Client Pipeline</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>Built in <strong>two stages</strong>: frequency counting on the Worker (server-side), and HTML rendering in the browser (client-side). No third-party library.</p>
+      <p>The Worker strips stop words, tokenises all post titles, and returns the <em>top 60 words as [word, count] pairs</em>, sorted by frequency descending.</p>
+      <p>The browser renders each word as a <strong>styled HTML span</strong> inside a flex-wrap container. Font size scales linearly from 11px to 52px based on frequency ratio.</p>
+      <p><strong>Why not a canvas library?</strong> Libraries like wordcloud2.js have silent failures on dynamic canvas sizing and font loading. Pure HTML is deterministic and always works.</p>
+    </div>
+  </div>
+
+</div>
+
+<hr class="divider" data-label="data flow walkthrough"/>
+
+<!-- ══════════════════════════════════════════
+     REQUEST LIFECYCLE
+══════════════════════════════════════════ -->
+<div class="section-title">03 — Request Lifecycle</div>
+<div class="section-sub">Step-by-step: what happens when you click a game tab</div>
+
+<div class="flow-steps">
+
+  <div class="flow-step">
+    <div class="step-num">01</div>
+    <div class="step-body">
+      <div class="step-title">User Opens Dashboard / Clicks a Tab</div>
+      <div class="step-desc">
+        The browser loads <strong>index.html</strong> from GitHub Pages. This is a single static file — HTML, CSS, and JavaScript all in one. GitHub Pages serves it over HTTPS with no server-side processing whatsoever. The JavaScript runs immediately in the browser and calls <em>fetchData('codm', true)</em>.
+      </div>
+      <span class="step-tag">GITHUB PAGES</span>
+      <span class="step-tag">BROWSER JS</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">02</div>
+    <div class="step-body">
+      <div class="step-title">Browser Calls the Cloudflare Worker</div>
+      <div class="step-desc">
+        The browser makes a <strong>GET request</strong> to <em>https://game_sentinel_multi.YOUR.workers.dev/api/sentiment?game=codm</em>. This hits Cloudflare's edge network — the request is routed to the nearest of Cloudflare's 300+ global data centres, so latency is minimal regardless of where the user is.
+      </div>
+      <span class="step-tag">CORS HEADERS</span>
+      <span class="step-tag">CLOUDFLARE EDGE</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">03</div>
+    <div class="step-body">
+      <div class="step-title">Worker Checks the Cache</div>
+      <div class="step-desc">
+        The Worker looks up a per-game cache key (e.g. <em>game-sentinel-codm-v3</em>) in <strong>caches.default</strong> — Cloudflare's built-in edge cache. If a result exists and is less than 15 minutes old, it returns immediately with <em>"cached": true</em> in the JSON, skipping all Reddit and OpenAI calls entirely. This is what makes tab-switching fast after first load.
+      </div>
+      <span class="step-tag">15-MIN TTL</span>
+      <span class="step-tag">PER-GAME KEY</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">04</div>
+    <div class="step-body">
+      <div class="step-title">Worker Fetches Reddit in Parallel</div>
+      <div class="step-desc">
+        On a cache miss, the Worker fires <strong>4 fetch calls simultaneously</strong> using <em>Promise.all()</em> — hot and new feeds for each of the game's two subreddits. For CODM: r/CODM/hot.json, r/CODM/new.json, r/CallofDutyMobile/hot.json, r/CallofDutyMobile/new.json. Results arrive in ~300–700ms. Posts are deduplicated by ID and stickied posts are filtered out.
+      </div>
+      <span class="step-tag">PROMISE.ALL</span>
+      <span class="step-tag">DEDUPLICATION</span>
+      <span class="step-tag">REDDIT PUBLIC API</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">05</div>
+    <div class="step-body">
+      <div class="step-title">Worker Calls OpenAI for Sentiment Scoring</div>
+      <div class="step-desc">
+        The first 60 deduplicated post titles are formatted as a numbered list and sent to <strong>gpt-4o-mini</strong> with a system prompt describing the scoring rules. The <em>response_format: json_object</em> parameter guarantees the response is parseable JSON. The model returns a score and category for each post plus the full community summary object. This step takes 5–15 seconds — the dominant cost in the pipeline.
+      </div>
+      <span class="step-tag">GPT-4O-MINI</span>
+      <span class="step-tag">JSON_OBJECT FORMAT</span>
+      <span class="step-tag">ZERO-SHOT</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">06</div>
+    <div class="step-body">
+      <div class="step-title">Worker Builds Word Frequencies</div>
+      <div class="step-desc">
+        Simultaneously with OpenAI (actually right after), the Worker tokenises all post titles — lowercasing, stripping punctuation, splitting on whitespace — then filters against a <strong>hardcoded stop-word list</strong> (~60 common words like "the", "a", "is"). The remaining words are counted and the top 60 by frequency are returned as <em>[word, count]</em> pairs. This runs in microseconds in pure JavaScript.
+      </div>
+      <span class="step-tag">SERVER-SIDE</span>
+      <span class="step-tag">STOP-WORD FILTER</span>
+      <span class="step-tag">TOP 60 WORDS</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">07</div>
+    <div class="step-body">
+      <div class="step-title">Worker Caches and Returns JSON</div>
+      <div class="step-desc">
+        The complete payload — summary, per-subreddit breakdown, word cloud, and enriched post list — is stored in <em>caches.default</em> with a <strong>Cache-Control: max-age=900</strong> header. The same payload is returned to the browser. Any subsequent request within 15 minutes returns from cache without touching Reddit or OpenAI.
+      </div>
+      <span class="step-tag">CACHE-CONTROL</span>
+      <span class="step-tag">MAX-AGE=900</span>
+    </div>
+  </div>
+
+  <div class="flow-step">
+    <div class="step-num">08</div>
+    <div class="step-body">
+      <div class="step-title">Browser Renders the Dashboard</div>
+      <div class="step-desc">
+        The browser parses the JSON and calls <em>renderDashboard(data, game)</em>. The game name is passed explicitly so the correct <strong>colour theme palette</strong> is applied. The canvas gauge is drawn, Chart.js renders the doughnut, word cloud spans are injected, topic chips animate in with staggered delays, and the post feed is built. The ticker duplicates its HTML for seamless CSS loop animation. Total client-side render time is under 50ms.
+      </div>
+      <span class="step-tag">CANVAS API</span>
+      <span class="step-tag">CHART.JS</span>
+      <span class="step-tag">CSS ANIMATIONS</span>
+    </div>
+  </div>
+
+</div>
+
+<hr class="divider" data-label="sentiment model deep dive"/>
+
+<!-- ══════════════════════════════════════════
+     SENTIMENT MODEL
+══════════════════════════════════════════ -->
+<div class="section-title">04 — How Sentiment Analysis Works</div>
+<div class="section-sub">Zero-shot LLM scoring via gpt-4o-mini</div>
+
+<div class="sentiment-grid">
+  <div class="sent-box">
+    <div class="sent-box-title">Scoring Scale</div>
+    <div class="score-bar">
+      <div class="score-track" style="width:100%"></div>
+      <div class="score-pointer" style="left:50%"></div>
+    </div>
+    <div class="score-labels"><span>-1.0 Very Negative</span><span>0.0 Neutral</span><span>+1.0 Very Positive</span></div>
+    <br/>
+    <div class="sent-row"><span class="sent-key">POSITIVE</span><span class="sent-val pos">score &gt; +0.15</span></div>
+    <div class="sent-row"><span class="sent-key">NEUTRAL</span> <span class="sent-val neu">-0.15 to +0.15</span></div>
+    <div class="sent-row"><span class="sent-key">NEGATIVE</span><span class="sent-val neg">score &lt; -0.15</span></div>
+    <div class="sent-row"><span class="sent-key">BATCH SIZE</span><span class="sent-val">60 posts per call</span></div>
+    <div class="sent-row"><span class="sent-key">MODEL</span><span class="sent-val">gpt-4o-mini</span></div>
+    <div class="sent-row"><span class="sent-key">METHOD</span><span class="sent-val">Zero-shot prompting</span></div>
+  </div>
+
+  <div class="sent-box">
+    <div class="sent-box-title">Output Structure</div>
+    <div class="sent-row"><span class="sent-key">overall_score</span><span class="sent-val pos">-1.0 → +1.0 float</span></div>
+    <div class="sent-row"><span class="sent-key">positive_pct</span><span class="sent-val">0–100 integer</span></div>
+    <div class="sent-row"><span class="sent-key">neutral_pct</span> <span class="sent-val">0–100 integer</span></div>
+    <div class="sent-row"><span class="sent-key">negative_pct</span><span class="sent-val">0–100 integer</span></div>
+    <div class="sent-row"><span class="sent-key">top_topics</span>  <span class="sent-val">array of 5 strings</span></div>
+    <div class="sent-row"><span class="sent-key">community_mood</span><span class="sent-val">1 sentence string</span></div>
+    <div class="sent-row"><span class="sent-key">trending_issue</span><span class="sent-val">1 sentence string</span></div>
+    <div class="sent-row"><span class="sent-key">per-post score</span><span class="sent-val">float + category</span></div>
+  </div>
+</div>
+
+<div class="mono-block"><span class="c">// System prompt instructs the model (simplified)</span>
+<span class="k">SYSTEM:</span> <span class="s">"You are a sentiment engine for a [GAME] community dashboard.
+Analyze Reddit post titles. Return ONLY valid JSON.
+Score range: -1.0 (very negative) to +1.0 (very positive).
+Category rules: positive if score > 0.15, negative if < -0.15, else neutral.
+positive_pct + neutral_pct + negative_pct must equal 100."</span>
+
+<span class="k">USER:</span> <span class="s">"Analyze these 60 Reddit post titles:
+1. New season update is absolutely broken
+2. Finally fixed the lag, loving this patch
+3. Why does ranked matchmaking take 10 minutes..."</span>
+
+<span class="c">// Model returns structured JSON only — no prose, no markdown</span>
+<span class="n">response_format: { type: "json_object" }  // enforced at API level</span></div>
+
+<p style="font-size:13px;color:var(--textd);line-height:1.6;margin-top:12px;">
+  <strong style="color:var(--text);">Why zero-shot?</strong> The model has been trained on enormous amounts of gaming community text and already understands the difference between "this is peak content" (positive irony), "typical Garena moment" (negative frustration), and genuine enthusiasm. No training examples are needed. The prompt simply defines the output format and scoring rules.
+</p>
+
+<hr class="divider" data-label="word cloud pipeline"/>
+
+<!-- ══════════════════════════════════════════
+     WORD CLOUD PIPELINE
+══════════════════════════════════════════ -->
+<div class="section-title">05 — Word Cloud Generation Pipeline</div>
+<div class="section-sub">Server-side counting → client-side HTML rendering</div>
+
+<div class="detail-card card-wordcloud" style="margin-bottom:24px;">
+  <div class="wc-pipeline">
+
+    <div class="wc-step">
+      <div class="wc-num">1</div>
+      <div>
+        <div class="wc-title">Input — All Post Titles</div>
+        <div class="wc-desc">Every deduplicated post title from all subreddits is fed into the function. For CODM this is typically <strong>80–120 titles</strong> after deduplication. The full text is used, not just the first 60 sent to OpenAI.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">2</div>
+      <div>
+        <div class="wc-title">Normalise & Tokenise (Worker)</div>
+        <div class="wc-desc">Each title is lowercased, then all non-alphanumeric characters are replaced with spaces using <code>.replace(/[^a-z0-9\s]/g, " ")</code>. The string is then split on whitespace into individual word tokens. This handles punctuation, special characters, and hyphens uniformly.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">3</div>
+      <div>
+        <div class="wc-title">Stop Word Filter (Worker)</div>
+        <div class="wc-desc">Tokens shorter than 3 characters are dropped. Tokens matching a <strong>hardcoded stop-word Set</strong> of ~60 common English words (a, the, and, is, it, you, they, very, just, etc.) are removed. A Set is used for O(1) lookup speed. Words like "bug", "patch", "ranked", "meta" survive.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">4</div>
+      <div>
+        <div class="wc-title">Frequency Count & Sort (Worker)</div>
+        <div class="wc-desc">Surviving words are counted into a plain JavaScript object: <code>freq[word] = (freq[word] || 0) + 1</code>. The object is then converted to entries, sorted descending by count, and sliced to the <strong>top 60 entries</strong>. These are returned in the API response as <code>[["ranked", 14], ["update", 11], ...]</code>.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">5</div>
+      <div>
+        <div class="wc-title">Font Size Scaling (Browser)</div>
+        <div class="wc-desc">Each word's font size is calculated as: <code>fontSize = 11 + (count / maxFreq) * 41</code> — giving a range of <strong>11px to 52px</strong>. The most frequent word always renders at maximum size. Opacity scales similarly from 0.55 to 1.0 so less common words visually recede.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">6</div>
+      <div>
+        <div class="wc-title">Deterministic Colour Assignment (Browser)</div>
+        <div class="wc-desc">Each word gets a colour from the game's palette using: <code>palette[charSum % palette.length]</code> where charSum is the sum of all character codes in the word. This means the <strong>same word always gets the same colour</strong> across re-renders, so the cloud doesn't flicker on refresh.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">7</div>
+      <div>
+        <div class="wc-title">Rotation & Glow Effects (Browser)</div>
+        <div class="wc-desc">Words with ratio &lt; 0.6 and length &lt; 10 characters get a slight rotation: <code>((charSum * 7 + length * 13) % 31) - 15</code> degrees — between −15° and +15°. This is also deterministic. A <code>text-shadow</code> glow is applied proportional to frequency. On hover, words snap to 0° rotation and scale to 1.12× via CSS transition.</div>
+      </div>
+    </div>
+
+    <div class="wc-step">
+      <div class="wc-num">8</div>
+      <div>
+        <div class="wc-title">HTML Flex Layout (Browser)</div>
+        <div class="wc-desc">All word spans are appended to a <code>div</code> with <code>display: flex; flex-wrap: wrap; justify-content: center</code>. The browser's layout engine handles placement naturally — <strong>no canvas, no collision detection, no library</strong>. Larger words push smaller words into available space organically.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider" data-label="cache & performance"/>
+
+<!-- ══════════════════════════════════════════
+     CACHE TABLE
+══════════════════════════════════════════ -->
+<div class="section-title">06 — Caching Strategy</div>
+<div class="section-sub">Three layers of caching keep the dashboard fast</div>
+
+<div class="detail-card" style="--card-accent:var(--amber);margin-bottom:48px;">
+  <table class="cache-table">
+    <thead>
+      <tr>
+        <th>Cache Layer</th>
+        <th>Where</th>
+        <th>Duration</th>
+        <th>Scope</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-amber">L1</span> Cloudflare Edge Cache</td>
+        <td>Cloudflare Worker — <code>caches.default</code></td>
+        <td>15 minutes</td>
+        <td>Per game key</td>
+        <td>Avoids calling Reddit + OpenAI on every request. Serves thousands of users from one cached response.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-blue">L2</span> Browser In-Memory Cache</td>
+        <td>JavaScript — <code>gameCache{}</code> object</td>
+        <td>Session only</td>
+        <td>Per game, per tab</td>
+        <td>Switching back to a game you already loaded renders instantly from memory, zero network request.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">L3</span> Auto-Refresh Timer</td>
+        <td>Browser — <code>setTimeout()</code></td>
+        <td>15 min interval</td>
+        <td>Current game only</td>
+        <td>Busts both L1 and L2 caches on the active game after 15 minutes, fetching fresh data automatically.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+</div><!-- /wrap -->
+
+<footer>
+  <div class="footer-logo">GAME SENTINEL</div>
+  <div class="footer-note">Architecture Reference · System Overview · Rev 2.0</div>
+</footer>
+
+</body>
+</html>
