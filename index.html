@@ -624,7 +624,11 @@ function endOverlayLoad() {
   setTimeout(() => {
     const o = document.getElementById('loading-overlay');
     o.classList.add('fade-out');
-    setTimeout(() => o.style.display = 'none', 700);
+    setTimeout(() => {
+      o.style.display = 'none';
+      // scroll to top so error banner is visible
+      window.scrollTo(0, 0);
+    }, 700);
   }, 400);
 }
 
@@ -1005,7 +1009,6 @@ async function fetchData(game, isFirst) {
   if (isLoading) return;
   isLoading = true;
 
-  // Show loading indicators
   const btn = document.getElementById('refreshBtn');
   btn.textContent = '↻ SCANNING...';
   btn.classList.add('spinning');
@@ -1013,44 +1016,63 @@ async function fetchData(game, isFirst) {
   document.getElementById('statusLbl').textContent = 'FETCHING';
   document.getElementById('tab-loading').classList.add('visible');
 
-  // Mark the tab as loading
   const activeTab = document.querySelector(`.game-tab[data-game="${game}"]`);
   if (activeTab) activeTab.classList.add('loading-tab');
 
   if (isFirst) startOverlayLoad();
 
+  // 35-second timeout — prevents infinite loading screen
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 35000);
+
   try {
     const res = await fetch(`${WORKER_URL}/api/sentiment?game=${game}`, {
       cache: 'no-store',
       headers: { 'Accept': 'application/json' },
+      signal: controller.signal,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
 
-    // !! KEY FIX !! — only render if the user is STILL on this game
-    // If they switched away while this was loading, just cache silently
+    clearTimeout(timeoutId);
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+    const data = await res.json();
+    if (data.error) throw new Error(`Worker error: ${data.error}`);
+
     gameCache[game] = data;
 
     if (game === currentGame) {
       renderDashboard(data, game);
       hideError();
     }
+
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error(`Fetch error [${game}]:`, err);
+
+    let msg = '';
+    if (err.name === 'AbortError') {
+      msg = 'REQUEST TIMED OUT after 35 seconds. The Worker may be overloaded or the OpenAI API is slow. Try refreshing.';
+    } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      msg = 'NETWORK ERROR — Could not reach the Worker. Check that WORKER_URL is correct and the Worker is deployed.';
+    } else {
+      msg = err.message;
+    }
+
     if (game === currentGame) {
-      showError('SIGNAL LOST — ' + err.message + '. Ensure WORKER_URL is set and the Worker is deployed.');
+      showError(msg);
       document.getElementById('statusDot').className = 'status-dot error';
       document.getElementById('statusLbl').textContent = 'ERROR';
       drawGauge(0);
     }
+
   } finally {
     isLoading = false;
     btn.textContent = '↺ REFRESH';
     btn.classList.remove('spinning');
     document.getElementById('tab-loading').classList.remove('visible');
     if (activeTab) activeTab.classList.remove('loading-tab');
-    if (isFirst) endOverlayLoad();
+    if (isFirst) endOverlayLoad(); // ← always runs, even on error
     if (game === currentGame) scheduleRefresh(game);
   }
 }
